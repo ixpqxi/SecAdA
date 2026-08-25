@@ -1,0 +1,28 @@
+[project]
+name = "secada"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "deepagents>=0.7.1",
+    "en-core-web-sm",
+    "ipython>=9.16.0",
+    "langchain>=1.3.14",
+    "langchain-deepseek>=1.1.0",
+    "langchain-openai>=1.4.0",
+    "langchain-redis>=0.2.5",
+    "langchain-unstructured>=1.0.1",
+    "langgraph>=1.2.9",
+    "langgraph-cli>=0.4.31",
+    "python-dotenv>=1.2.2",
+    "unstructured[md]>=0.25.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 80
+indent-width = 2
+
+[tool.uv.sources]
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
