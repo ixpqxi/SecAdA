@@ -57,13 +57,6 @@ def main() -> int:
     return 1
 
   try:
-    # result = build_agent().invoke(
-    #   {
-    #     "messages": [
-    #       {"role": "user", "content": "What's the weather in San Francisco?"}
-    #     ]
-    #   }
-    # )
     stream = build_agent().stream_events(
       {
         "messages": [

@@ -1,4 +1,4 @@
-"""Command-line entry point for structural vulnerability discovery."""
+"""Command-line entry point for taint discovery and report verification."""
 
 import argparse
 import json
@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from openai import OpenAIError
 
 from .agent import create_vulnerability_discovery_agent
+from .pipeline import create_taint_audit_pipeline
 
 
 APPLICATION_ROOT = Path(__file__).resolve().parents[2]
@@ -18,8 +19,8 @@ def build_parser() -> argparse.ArgumentParser:
   parser = argparse.ArgumentParser(
     prog="vuln-discovery-auditor",
     description=(
-      "Perform evidence-backed attack-surface and taint-flow vulnerability "
-      "discovery on a source project."
+      "Run evidence-backed taint-flow vulnerability discovery, then pass the "
+      "resulting report to vuln-report-verifier."
     ),
   )
   parser.add_argument("project", type=Path, help="target project's root path")
@@ -31,6 +32,15 @@ def build_parser() -> argparse.ArgumentParser:
   parser.add_argument(
     "--instruction",
     help="optional audit focus appended to the complete default workflow",
+  )
+  parser.add_argument(
+    "--verification-instruction",
+    help="optional verification focus appended to the complete review workflow",
+  )
+  parser.add_argument(
+    "--audit-only",
+    action="store_true",
+    help="run only vulnerability discovery without report verification",
   )
   parser.add_argument(
     "--recursion-limit",
@@ -57,27 +67,45 @@ def main(argv: list[str] | None = None) -> int:
     )
     return 2
   try:
-    agent = create_vulnerability_discovery_agent(
-      args.project,
-      output_directory=args.output_directory,
-      recursion_limit=args.recursion_limit,
-      completion_retries=args.completion_retries,
-    )
-    result = agent.invoke(args.instruction)
-  except (OpenAIError, RuntimeError, ValueError) as exc:
-    print(f"Vulnerability discovery failed: {exc}", file=sys.stderr)
-    return 1
-  print(
-    json.dumps(
-      {
+    if args.audit_only:
+      agent = create_vulnerability_discovery_agent(
+        args.project,
+        output_directory=args.output_directory,
+        recursion_limit=args.recursion_limit,
+        completion_retries=args.completion_retries,
+      )
+      result = agent.invoke(args.instruction)
+      payload = {
         "status": "completed",
-        "output_path": str(result.output_path),
+        "audit_report_path": str(result.output_path),
         "agent_response": result.final_response,
-      },
-      ensure_ascii=False,
-      indent=2,
-    )
-  )
+      }
+    else:
+      result = create_taint_audit_pipeline(
+        args.project,
+        output_directory=args.output_directory,
+        recursion_limit=args.recursion_limit,
+        completion_retries=args.completion_retries,
+      ).invoke(
+        audit_instruction=args.instruction,
+        verification_instruction=args.verification_instruction,
+      )
+      payload = {
+        "status": "completed",
+        "audit_report_path": (
+          str(result.audit_report_path) if result.audit_report_path else None
+        ),
+        "verification_report_path": (
+          str(result.verification_report_path)
+          if result.verification_report_path
+          else None
+        ),
+        "summary": result.state["summary"],
+      }
+  except (OpenAIError, RuntimeError, ValueError) as exc:
+    print(f"Taint audit pipeline failed: {exc}", file=sys.stderr)
+    return 1
+  print(json.dumps(payload, ensure_ascii=False, indent=2))
   return 0
 
 
